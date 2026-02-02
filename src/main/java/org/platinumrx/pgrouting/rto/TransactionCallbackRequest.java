@@ -1,17 +1,18 @@
 package org.platinumrx.pgrouting.rto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
+import org.platinumrx.pgrouting.models.PaymentGateways;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
+@ToString
 public class TransactionCallbackRequest {
+    @JsonProperty("order_id")
     private String orderId;
     private TransactionStatus status;
-    private PaymentGateway gateway;
+    private PaymentGateways gateway;
     private String reason;
 }

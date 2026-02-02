@@ -1,9 +1,7 @@
 package org.platinumrx.pgrouting.rto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 
 import java.time.Instant;
 
@@ -11,8 +9,9 @@ import java.time.Instant;
 @NoArgsConstructor
 @Getter
 @Setter
-public class PaymentInstruction {
+@ToString
+public class PaymentInstrument {
     private PaymentMethod type;
-    private String cardNumber;
+    @JsonProperty("card_number") private String cardNumber;
     private Instant expiry;
 }

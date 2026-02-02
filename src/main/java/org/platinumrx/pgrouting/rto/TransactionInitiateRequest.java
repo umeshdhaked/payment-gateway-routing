@@ -1,16 +1,15 @@
 package org.platinumrx.pgrouting.rto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
+@ToString
 public class TransactionInitiateRequest {
-    private String orderId;
+    @JsonProperty("order_id") private String orderId;
     public Double amount;
-    private PaymentInstruction paymentInstruction;
+    @JsonProperty("payment_instrument") private PaymentInstrument paymentInstrument;
 }

@@ -1,18 +1,25 @@
 package org.platinumrx.pgrouting.controllers;
 
 import lombok.extern.slf4j.Slf4j;
-import org.platinumrx.pgrouting.rto.TransactionCallbackRequest;
-import org.platinumrx.pgrouting.rto.TransactionCallbackResponse;
-import org.platinumrx.pgrouting.rto.TransactionInitiateRequest;
-import org.platinumrx.pgrouting.rto.TransactionInitiateResponse;
+import org.platinumrx.pgrouting.models.PaymentGateways;
+import org.platinumrx.pgrouting.rto.*;
+import org.platinumrx.pgrouting.services.TransactionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @Slf4j
 @RequestMapping("/transactions")
 public class TransactionController {
+
+    private TransactionService transactionService;
+
+    public TransactionController(TransactionService transactionService) {
+        this.transactionService = transactionService;
+    }
 
     @PostMapping("/initiate")
     public ResponseEntity<TransactionInitiateResponse> initiateTransaction(@RequestBody TransactionInitiateRequest request,
@@ -20,7 +27,9 @@ public class TransactionController {
 
         log.info("Transaction Request received -> request: {}, headers: {} ", request, headers);
 
-        return ResponseEntity.ok(new TransactionInitiateResponse());
+        TransactionInitiateResponse transactionInitiateResponse = transactionService.initiateTransaction(request);
+
+        return ResponseEntity.ok(transactionInitiateResponse);
     }
 
     @PostMapping("/callback")
@@ -28,7 +37,10 @@ public class TransactionController {
                                                                            @RequestHeader HttpHeaders headers) {
         log.info("Callback Request received -> request: {}, headers: {} ", transactionCallbackRequest, headers);
 
-        return ResponseEntity.ok(new TransactionCallbackResponse());
+        TransactionCallbackResponse transactionCallbackResponse
+                = transactionService.updatePaymentStatus(transactionCallbackRequest);
+
+        return ResponseEntity.ok(transactionCallbackResponse);
     }
 
 }
