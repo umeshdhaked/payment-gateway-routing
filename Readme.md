@@ -1,5 +1,8 @@
 # Intelligent Payment Gateway Routing Application
 
+Application will run on port 8080
+Application configuration is in application.properties
+
 To run the application:
 ```aiignore
 mvn spring-boot:run

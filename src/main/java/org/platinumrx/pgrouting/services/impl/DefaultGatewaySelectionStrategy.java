@@ -1,5 +1,6 @@
 package org.platinumrx.pgrouting.services.impl;
 
+import lombok.extern.slf4j.Slf4j;
 import org.platinumrx.pgrouting.gateways.PaymentGatewayFactory;
 import org.platinumrx.pgrouting.gateways.PaymentGatewayService;
 import org.platinumrx.pgrouting.dbo.GatewayStatusDetails;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@Slf4j
 public class DefaultGatewaySelectionStrategy implements GatewaySelectionStrategy {
 
     private final LoadDistributionConfiguration loadDistributionConfiguration;
@@ -38,6 +40,8 @@ public class DefaultGatewaySelectionStrategy implements GatewaySelectionStrategy
 
         Map<PaymentGateways, Integer> distribution = loadDistributionConfiguration.getPaymentMethodDistribution();
 
+        log.info("Payment Gateway Distribution: {}", distribution);
+
         if (distribution == null || distribution.isEmpty()) {
             throw new RuntimeException("No payment gateway distribution configured");
         }
@@ -52,15 +56,20 @@ public class DefaultGatewaySelectionStrategy implements GatewaySelectionStrategy
             GatewayStatusDetails statusDetails = paymentGatewayStatusRepo.getStatus(gateway);
             boolean isEnabled = statusDetails.getStatus() == PaymentGatewayStatus.ENABLED;
 
+            log.info("Gateway {} is {}. Checking if it can be used", gateway, isEnabled ? "enabled" : "disabled");
+
             if (!isEnabled && statusDetails.getStatus() == PaymentGatewayStatus.TEMP_DISABLED) {
+                log.info("Gateway {} is temporarily disabled. Checking if it can be enabled", gateway);
                 if (statusDetails.getLastUpdated().plusSeconds(tempDisableDurationSeconds)
                         .isBefore(java.time.Instant.now())) {
                     isEnabled = true;
                     paymentGatewayStatusRepo.updateStatus(gateway, PaymentGatewayStatus.ENABLED);
+                    log.info("Gateway {} is enabled again", gateway);
                 }
             }
 
             Boolean isAvailable = paymentGatewayFactory.getPaymentGatewayService(gateway).checkHealth();
+            log.info("Health check result for gateway {} is {}", gateway, isAvailable ? "healthy" : "unhealthy");
 
             if (isEnabled && isAvailable) {
                 if (weight != null && weight > 0) {
@@ -74,12 +83,15 @@ public class DefaultGatewaySelectionStrategy implements GatewaySelectionStrategy
             throw new RuntimeException("No healthy payment gateways available");
         }
 
+        log.info("Total active gateways are {}", activeGateways);
+
         int randomWeight = new java.util.Random().nextInt(totalWeight);
         int currentWeight = 0;
 
         for (Map.Entry<PaymentGateways, Integer> entry : activeGateways.entrySet()) {
             currentWeight += entry.getValue();
             if (randomWeight < currentWeight) {
+                log.info("Selected gateway is {}", entry.getKey());
                 return paymentGatewayFactory.getPaymentGatewayService(entry.getKey());
             }
         }

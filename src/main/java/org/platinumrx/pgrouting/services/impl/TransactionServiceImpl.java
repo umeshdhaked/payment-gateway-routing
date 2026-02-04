@@ -39,6 +39,8 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         public TransactionInitiateResponse initiateTransaction(TransactionInitiateRequest request) {
+                log.info("Initiating transaction for order {}", request.getOrderId());
+
                 String transactionId = UUID.randomUUID().toString();
 
                 PaymentGatewayService gateway = gatewaySelectionStrategy.getGateway();
@@ -51,7 +53,7 @@ public class TransactionServiceImpl implements TransactionService {
                 orderTransactionEntity.setTransactionId(transactionId);
                 OrderTransactionEntity resp = orderTransactionRepo.save(orderTransactionEntity);
 
-                log.info("Initiating transaction for gateway: {}", gateway.getGatewayName());
+                log.info("Initiated transaction for order {} with gateway {}", resp.getOrderId(), resp.getGateway());
 
                 return TransactionInitiateResponse.builder()
                                 .orderId(resp.getOrderId())
@@ -61,6 +63,8 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         public TransactionCallbackResponse updatePaymentStatus(TransactionCallbackRequest transactionCallbackRequest) {
+                log.info("Transaction callback received for order {} with status {}",
+                        transactionCallbackRequest.getOrderId(), transactionCallbackRequest.getStatus());
 
                 OrderTransactionStatus transactionStatus = TransactionStatus.SUCCESS
                                 .equals(transactionCallbackRequest.getStatus())
@@ -74,9 +78,12 @@ public class TransactionServiceImpl implements TransactionService {
 
                 Double successRate = paymentGatewayStatsRepo
                                 .getPaymentSuccessRate(transactionCallbackRequest.getGateway());
+
+                log.info("Gateway {} success rate is {}", transactionCallbackRequest.getGateway(), successRate);
+
                 if (transactionStatus.equals(OrderTransactionStatus.FAILURE) && successRate < minSuccessThreshold) {
                         log.warn("Gateway {} success rate is {}, disabling it.",
-                                        transactionCallbackRequest.getGateway(),
+                                transactionCallbackRequest.getGateway(),
                                         successRate);
                         paymentGatewayStatusRepo.updateStatus(transactionCallbackRequest.getGateway(),
                                         PaymentGatewayStatus.TEMP_DISABLED);
