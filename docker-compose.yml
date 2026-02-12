@@ -1,10 +1,97 @@
+version: '3.8'
+
 services:
-  platinumrx-app:
-    build: .
-    image: platinumrx:latest
-    container_name: platinumrx-container
+  # PostgreSQL Master
+  postgres-master:
+    image: postgres:15-alpine
+    container_name: platinumrx-postgres-master
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: platinumrx
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-master-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
+    networks:
+      - platinumrx-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # pgbouncer for Master (Connection Pooling)
+  pgbouncer-master:
+    image: edoburu/pgbouncer:latest
+    container_name: platinumrx-pgbouncer-master
+    environment:
+      DATABASE_URL: "postgres://postgres:postgres@postgres-master:5432/platinumrx"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+    ports:
+      - "6432:5432"
+    networks:
+      - platinumrx-network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Redis for Payment Gateway Stats
+  redis:
+    image: redis:7-alpine
+    container_name: platinumrx-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - platinumrx-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: platinumrx-app
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      # Database configuration (using Docker service names)
+      SPRING_DATASOURCE_WRITE_JDBCURL: jdbc:postgresql://postgres-master:5432/platinumrx
+      SPRING_DATASOURCE_WRITE_USERNAME: postgres
+      SPRING_DATASOURCE_WRITE_PASSWORD: postgres
+      SPRING_DATASOURCE_READ_JDBCURL: jdbc:postgresql://postgres-master:5432/platinumrx
+      SPRING_DATASOURCE_READ_USERNAME: postgres
+      SPRING_DATASOURCE_READ_PASSWORD: postgres
+      # Redis configuration
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # Application configuration
+      SPRING_APPLICATION_NAME: platinumrx
+    networks:
+      - platinumrx-network
+    depends_on:
+      pgbouncer-master:
+        condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+networks:
+  platinumrx-network:
+    driver: bridge
+
+volumes:
+  postgres-master-data:
+  redis-data:
